@@ -1,0 +1,514 @@
+# =============================================================================
+# YOLO Training Configuration - Local Training
+# =============================================================================
+# Configuration file for local YOLO model training without cloud dependencies.
+# This is the single source of truth for all training settings.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Model Configuration
+# -----------------------------------------------------------------------------
+model:
+  type: pavement                    # Model type identifier (used in run names and filenames)
+  task: segment                      # Task type: must be 'segment' for segmentation
+
+# -----------------------------------------------------------------------------
+# Local Paths
+# -----------------------------------------------------------------------------
+local:
+  # Directory containing your YOLO dataset (with images/ and labels/ subdirectories)
+  dataset_dir: "./dataset/internship_dataset"
+
+  # Directory containing pre-trained weights (e.g., yolo26n.pt)
+  # If weights don't exist, Ultralytics will download them automatically
+  weights_dir: "./weights"
+
+  # Output directory for training runs (models, plots, logs)
+  output_dir: "./runs"
+
+# -----------------------------------------------------------------------------
+# Dataset Configuration
+# -----------------------------------------------------------------------------
+dataset:
+  # Paths relative to dataset_dir
+  relative_train_img_path: images/train
+  relative_val_img_path: images/val
+
+  # Optional: Dataset class balancing via oversampling
+  balance:
+    enabled: false                         # Enable class balancing
+    mode: oversample                       # Balancing method (currently only "oversample" supported)
+    target: max                         # Target count: "max", "median", or integer value
+                                          # - "max": balance to majority class count
+                                          # - "median": balance to median class count
+                                          # - 500: balance to specific count
+    max_dup_per_image: 10                 # Maximum times to duplicate a single image
+    save_debug_hist: true                  # Save CSV histograms before/after balancing
+
+# -----------------------------------------------------------------------------
+# Training Configuration
+# -----------------------------------------------------------------------------
+training:
+  # Base segmentation model weights to use
+  # Recommended: yolo11s-seg (good balance of speed and accuracy)
+  # Available: yolo11n-seg, yolo11s-seg, yolo11m-seg, yolo11l-seg, yolo11x-seg
+  # Also supported: 
+  #       yolo8n-seg through yolo8x-seg, 
+  #       yolo26n-seg through yolo26x-seg, 
+  #       yolo12n through yolo12x (this loads yolo12-seg.yaml to support segmentation)
+  weights_version: yolo11s-seg
+
+  # =============================================================================
+  # Core Training Settings
+  # =============================================================================
+
+  # Total number of training epochs. Each epoch represents a full pass over the
+  # entire dataset. Adjusting this value can affect training duration and model
+  # performance. (Default: 100)
+  epochs: 150
+
+  # Maximum training time in hours. If set, this overrides the epochs argument,
+  # allowing training to automatically stop after the specified duration. Useful
+  # for time-constrained training scenarios. (Default: None)
+  # time: null
+
+  # Number of epochs to wait without improvement in validation metrics before
+  # early stopping the training. Helps prevent overfitting by stopping training
+  # when performance plateaus. Set to 0 to disable. (Default: 100)
+  patience: 20
+
+  # Batch size with three modes:
+  # - Set as an integer (e.g., batch=16)
+  # - Auto mode for 60% GPU memory utilization (batch=-1)
+  # - Auto mode with specified utilization fraction (batch=0.70)
+  # (Default: 16)
+  batch: 16
+
+  # Target image size for training. Images are resized to squares with sides
+  # equal to the specified value (if rect=False), preserving aspect ratio for
+  # YOLO models. Affects model accuracy and computational complexity. Can be a
+  # single int or list [height, width]. (Default: 640)
+  imgsz: 640
+
+  # Specifies the computational device(s) for training:
+  # - Single GPU: device=0
+  # - Multiple GPUs: device=[0,1] or device="0,1,2,3"
+  # - CPU: device="cpu"
+  # - Apple Silicon MPS: device="mps"
+  # - Auto-select most idle GPU: device=-1
+  # - Auto-select multiple idle GPUs: device=[-1,-1]
+  # (Default: None for auto-selection)
+  device: cpu
+
+  # Number of worker threads for data loading (per RANK if Multi-GPU training).
+  # Influences the speed of data preprocessing and feeding into the model,
+  # especially useful in multi-GPU setups. (Default: 8)
+  workers: 8
+
+  # =============================================================================
+  # Save & Output Settings
+  # =============================================================================
+
+  # Enables saving of training checkpoints and final model weights. Useful for
+  # resuming training or model deployment. (Default: True)
+  save: true
+
+  # Frequency of saving model checkpoints, specified in epochs. A value of -1
+  # disables this feature (only saves last checkpoint). Useful for saving interim
+  # models during long training sessions. (Default: -1)
+  save_period: -1
+
+  # Generates and saves plots of training and validation metrics, as well as
+  # prediction examples, providing visual insights into model performance and
+  # learning progression. (Default: True)
+  plots: true
+
+  # Name of the project directory where training outputs are saved. Allows for
+  # organized storage of different experiments. (Default: None, auto-generated)
+  # project: null
+
+  # Name of the training run. Used for creating a subdirectory within the project
+  # folder, where training logs and outputs are stored. (Default: None, auto-generated)
+  # name: null
+
+  # If True, allows overwriting of an existing project/name directory. Useful for
+  # iterative experimentation without needing to manually clear previous outputs.
+  # (Default: False)
+  # exist_ok: false
+
+  # =============================================================================
+  # Model Settings
+  # =============================================================================
+
+  # Determines whether to start training from a pretrained model. Can be a boolean
+  # value or a string path to a specific model from which to load weights. Enhances
+  # training efficiency and model performance. (Default: True)
+  pretrained: true
+
+  # Freezes the first N layers of the model or specified layers by index (e.g.,
+  # freeze=10 or freeze=[0,1,2]), reducing the number of trainable parameters.
+  # Useful for fine-tuning or transfer learning. (Default: None)
+  freeze: null
+
+  # Sets the random seed for training, ensuring reproducibility of results across
+  # runs with the same configurations. (Default: 0)
+  # seed: 0
+
+  # Forces deterministic algorithm use, ensuring reproducibility but may affect
+  # performance and speed due to the restriction on non-deterministic algorithms.
+  # (Default: True)
+  # deterministic: true
+
+  # Treats all classes in multi-class datasets as a single class during training.
+  # Useful for binary classification tasks or when focusing on object presence
+  # rather than classification. (Default: False)
+  # single_cls: false
+
+  # Specifies a list of class IDs to train on. Useful for filtering out and
+  # focusing only on certain classes during training. (Default: None)
+  # classes: null
+
+  # =============================================================================
+  # Optimization Settings
+  # =============================================================================
+
+  # Choice of optimizer for training. Options include: SGD, Adam, AdamW, NAdam,
+  # RAdam, RMSProp, or 'auto' for automatic selection based on model configuration.
+  # Affects convergence speed and stability. (Default: 'auto')
+  optimizer: AdamW
+
+  # Initial learning rate (i.e., SGD=1E-2, Adam=1E-3). Adjusting this value is
+  # crucial for the optimization process, influencing how rapidly model weights
+  # are updated. (Default: 0.01)
+  lr0: 0.0001
+
+  # Final learning rate as a fraction of the initial rate = (lr0 * lrf), used in
+  # conjunction with schedulers to adjust the learning rate over time.
+  # (Default: 0.01)
+  lrf: 0.0001
+
+  # Momentum factor for SGD or beta1 for Adam optimizers, influencing the
+  # incorporation of past gradients in the current update. (Default: 0.937)
+  momentum: 0.937
+
+  # L2 regularization term, penalizing large weights to prevent overfitting.
+  # (Default: 0.0005)
+  weight_decay: 0.0005
+
+  # Number of epochs for learning rate warmup, gradually increasing the learning
+  # rate from a low value to the initial learning rate to stabilize training early
+  # on. Can be fractional. (Default: 3.0)
+  warmup_epochs: 3.0
+
+  # Initial momentum for warmup phase, gradually adjusting to the set momentum
+  # over the warmup period. (Default: 0.8)
+  # warmup_momentum: 0.8
+
+  # Learning rate for bias parameters during the warmup phase, helping stabilize
+  # model training in the initial epochs. (Default: 0.1)
+  # warmup_bias_lr: 0.1
+
+  # Utilizes a cosine learning rate scheduler, adjusting the learning rate
+  # following a cosine curve over epochs. Helps in managing learning rate for
+  # better convergence. (Default: False)
+  cos_lr: false
+
+  # =============================================================================
+  # Advanced Training Settings
+  # =============================================================================
+
+  # Enables caching of dataset images:
+  # - True or "ram": cache in memory
+  # - "disk": cache on disk
+  # - False: disable caching
+  # Improves training speed by reducing disk I/O at the cost of increased memory
+  # usage. (Default: False)
+  cache: false
+
+  # Resumes training from the last saved checkpoint. Automatically loads model
+  # weights, optimizer state, and epoch count, continuing training seamlessly.
+  # (Default: False)
+  resume: false
+
+  # Enables Automatic Mixed Precision (AMP) training, reducing memory usage and
+  # possibly speeding up training with minimal impact on accuracy. (Default: True)
+  amp: true
+
+  # Specifies the fraction of the dataset to use for training (0.0-1.0). Allows
+  # for training on a subset of the full dataset, useful for experiments or when
+  # resources are limited. (Default: 1.0)
+  fraction: 1.0
+
+  # Enables minimum padding strategy—images in a batch are minimally padded to
+  # reach a common size, with the longest side equal to imgsz. Can improve
+  # efficiency and speed but may affect model accuracy. (Default: False)
+  # rect: false
+
+  # Randomly vary imgsz each batch by +/- multi_scale (e.g., 0.25 -> 0.75x to
+  # 1.25x), rounding to model stride multiples. 0.0 disables multi-scale training.
+  # (Default: 0.0)
+  multi_scale: false
+
+  # Disables mosaic data augmentation in the last N epochs to stabilize training
+  # before completion. Setting to 0 disables this feature. (Default: 10)
+  close_mosaic: 6
+
+  # Enables profiling of ONNX and TensorRT speeds during training, useful for
+  # optimizing model deployment. (Default: False)
+  # profile: false
+
+  # Enables PyTorch 2.x torch.compile graph compilation with backend='inductor'.
+  # Accepts:
+  # - True → "default"
+  # - False → disables
+  # - String mode: "default", "reduce-overhead", "max-autotune-no-cudagraphs"
+  # Falls back to eager with a warning if unsupported. (Default: False)
+  # compile: false
+
+  # Enables verbose output during training, displaying progress bars, per-epoch
+  # metrics, and additional training information in the console. (Default: True)
+  # verbose: true
+
+  # =============================================================================
+  # Validation Settings
+  # =============================================================================
+
+  # Enables validation during training, allowing for periodic evaluation of model
+  # performance on a separate dataset. (Default: True)
+  val: true
+
+  # Dataset split to use for validation: "val", "test", or "train". (Default: "val")
+  split: val
+
+  # Specifies the maximum number of objects retained during validation phase of
+  # training. (Default: 300)
+  # max_det: 300
+
+  # =============================================================================
+  # Loss Weights
+  # =============================================================================
+
+  # Weight of the box loss component in the loss function, influencing how much
+  # emphasis is placed on accurately predicting bounding box coordinates.
+  # (Default: 7.5)
+  box: 6.472046758066393
+
+  # Weight of the classification loss in the total loss function, affecting the
+  # importance of correct class prediction relative to other components.
+  # (Default: 0.5)
+  cls: 0.4245055899206813
+
+  # Weight of the distribution focal loss, used in certain YOLO versions for
+  # fine-grained classification. (Default: 1.5)
+  dfl: 1.7880416188940305
+
+  # Nominal batch size for normalization of loss. (Default: 64)
+  # nbs: 64
+
+  # =============================================================================
+  # Segmentation-Specific Settings
+  # =============================================================================
+
+  # Determines whether object masks should be merged into a single mask for
+  # training, or kept separate for each object. In case of overlap, the smaller
+  # mask is overlaid on top of the larger mask during merge. (Default: True)
+  # overlap_mask: true
+
+  # Downsample ratio for segmentation masks, affecting the resolution of masks
+  # used during training. (Default: 4)
+  # mask_ratio: 4
+
+
+  # =============================================================================
+  # Data Augmentation - Geometric Transformations
+  # =============================================================================
+
+  # Rotates the image randomly within the specified degree range (0.0-180.0),
+  # improving the model's ability to recognize objects at various orientations.
+  # (Default: 0.0)
+  degrees: 7.540477251846213
+
+  # Translates the image horizontally and vertically by a fraction of the image
+  # size (0.0-1.0), aiding in learning to detect partially visible objects.
+  # (Default: 0.1)
+  # translate: 0.1
+
+  # Scales the image by a gain factor (0.0-1.0), simulating objects at different
+  # distances from the camera. (Default: 0.5)
+  scale: 0.5043082214741127
+
+  # Shears the image by a specified degree (-180 to +180), mimicking the effect
+  # of objects being viewed from different angles. (Default: 0.0)
+  shear: 2.454201484770604
+
+  # Applies a random perspective transformation to the image (0.0-0.001),
+  # enhancing the model's ability to understand objects in 3D space. (Default: 0.0)
+  perspective: 0.0004466562558587953
+
+  # Flips the image upside down with the specified probability (0.0-1.0),
+  # increasing the data variability without affecting the object's characteristics.
+  # ⚠️ Use 0.0 for objects that never appear upside down (e.g., roads, vehicles).
+  # (Default: 0.0)
+  # flipud: 0.0
+
+  # Flips the image left to right with the specified probability (0.0-1.0), useful
+  # for learning symmetrical objects and increasing dataset diversity. (Default: 0.5)
+  # fliplr: 0.5
+
+  # =============================================================================
+  # Data Augmentation - Color Transformations
+  # =============================================================================
+
+  # Adjusts the hue of the image by a fraction of the color wheel (0.0-1.0),
+  # introducing color variability. Helps the model generalize across different
+  # lighting conditions. (Default: 0.015)
+  hsv_h: 0.0011038959506491496
+
+  # Alters the saturation of the image by a fraction (0.0-1.0), affecting the
+  # intensity of colors. Useful for simulating different environmental conditions.
+  # (Default: 0.7)
+  hsv_s: 0.8953029811437263
+
+  # Modifies the value (brightness) of the image by a fraction (0.0-1.0), helping
+  # the model to perform well under various lighting conditions. (Default: 0.4)
+  hsv_v: 0.4031640652676781
+
+  # Flips the image channels from RGB to BGR with the specified probability
+  # (0.0-1.0), useful for increasing robustness to incorrect channel ordering.
+  # (Default: 0.0)
+  # bgr: 0.0
+
+  # =============================================================================
+  # Data Augmentation - Advanced Techniques
+  # =============================================================================
+
+  # Combines four training images into one (0.0-1.0 probability), simulating
+  # different scene compositions and object interactions. Highly effective for
+  # complex scene understanding. (Default: 1.0)
+  mosaic: 0.9657687690886136
+
+  # Blends two images and their labels (0.0-1.0 probability), creating a composite
+  # image. Enhances the model's ability to generalize by introducing label noise
+  # and visual variability. (Default: 0.0)
+  mixup: 0.05600698028710086
+
+  # Combines portions of two images (0.0-1.0 probability), creating a partial
+  # blend while maintaining distinct regions. Enhances model robustness by creating
+  # occlusion scenarios. (Default: 0.0)
+  # cutmix: 0.0
+
+  # Copies and pastes objects across images to increase object instances (0.0-1.0
+  # probability). Segmentation tasks only. (Default: 0.0)
+  copy_paste: 0.23204717940797737
+
+  # Specifies the copy-paste strategy to use. Options: 'flip' or 'mixup'.
+  # Segmentation only. (Default: 'flip')
+  # copy_paste_mode: flip
+
+# =============================================================================
+# Configuration Examples
+# =============================================================================
+#
+# Example 1: Quick test run on CPU
+# ---------------------------------
+# training:
+#   device: cpu
+#   epochs: 10
+#   batch: 4
+#   imgsz: 320
+#   patience: 5
+#   save_period: 2
+#
+# Example 2: Balanced dataset with moderate augmentation
+# -------------------------------------------------------
+# dataset:
+#   balance:
+#     enabled: true
+#     target: max
+# training:
+#   weights_version: yolo11s-seg
+#   copy_paste: 0.3
+#   mosaic: 1.0
+#   mixup: 0.1
+#   overlap_mask: true
+#   mask_ratio: 4
+#
+# Example 3: Heavy augmentation for robust segmentation
+# ------------------------------------------------------
+# training:
+#   weights_version: yolo11m-seg
+#   mosaic: 1.0
+#   mixup: 0.2
+#   copy_paste: 0.3
+#   degrees: 10.0
+#   translate: 0.15
+#   scale: 0.7
+#   shear: 5.0
+#   perspective: 0.0005
+#   hsv_h: 0.02
+#   hsv_s: 0.8
+#   hsv_v: 0.5
+#   fliplr: 0.5
+#   flipud: 0.0
+#
+# Example 4: Fine-tuning with frozen backbone
+# --------------------------------------------
+# training:
+#   weights_version: yolo11m-seg
+#   pretrained: true
+#   freeze: 10              # Freeze first 10 layers
+#   epochs: 50
+#   lr0: 0.0001             # Lower learning rate for fine-tuning
+#   patience: 15
+#
+# Example 5: Multi-GPU training with auto-batch
+# ----------------------------------------------
+# training:
+#   device: [0,1,2,3]       # Use 4 GPUs
+#   batch: -1               # Auto-batch for 60% GPU memory
+#   workers: 16             # Increase workers for multi-GPU
+#   cache: ram              # Cache in RAM for faster loading
+#   amp: true               # Use mixed precision
+#
+# Example 6: Memory-efficient training
+# -------------------------------------
+# training:
+#   batch: 8                # Smaller batch size
+#   imgsz: 480              # Smaller image size
+#   cache: false            # No caching to save memory
+#   workers: 4              # Fewer workers
+#   amp: true               # Use AMP to reduce memory
+#   rect: true              # Rectangular training for efficiency
+#
+# Example 7: Training subset for quick experiments
+# -------------------------------------------------
+# training:
+#   fraction: 0.1           # Use only 10% of dataset
+#   epochs: 20
+#   patience: 5
+#   val: true
+#   plots: true
+#
+# Example 8: Resume interrupted training
+# ---------------------------------------
+# training:
+#   resume: true            # Resume from last checkpoint
+#   # All other settings will be loaded from the checkpoint
+#
+# Example 9: Production segmentation training
+# --------------------------------------------
+# training:
+#   weights_version: yolo11l-seg
+#   epochs: 300
+#   patience: 50
+#   batch: 32
+#   imgsz: 640
+#   save: true
+#   save_period: 10         # Save checkpoint every 10 epochs
+#   val: true
+#   plots: true
+#   close_mosaic: 15        # Disable mosaic in last 15 epochs
+#   copy_paste: 0.3
+#   verbose: true
+#
+# =============================================================================

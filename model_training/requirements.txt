@@ -1,0 +1,5 @@
+ultralytics>=8.4.8
+PyYAML>=6.0.2
+tqdm>=4.67.1
+onnxruntime-gpu
+onnxslim>=0.1.71
