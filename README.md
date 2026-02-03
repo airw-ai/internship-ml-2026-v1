@@ -358,6 +358,12 @@ See `model_training/config.example.yaml` for all available augmentation paramete
   - YOLO model selection and comparison
   - Troubleshooting and performance tips
 
+- **[model_training/README_RESULTS.md](model_training/README_RESULTS.md)**: Training results interpretation guide
+  - Understanding training outputs and artifacts
+  - Interpreting metrics and plots
+  - Analyzing model performance
+  - Results structure and file organization
+
 - **[model_training/config.example.yaml](model_training/config.example.yaml)**: Comprehensive configuration template
   - All 80+ available parameters documented
   - Parameter descriptions, ranges, and defaults
