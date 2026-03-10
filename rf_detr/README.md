@@ -116,6 +116,76 @@ runs/rf_detr/
 └── logs/                         # TensorBoard event files
 ```
 
+## Augmentation
+
+RF-DETR uses [albumentations](https://albumentations.ai/) for training-time image augmentation. Augmentation is applied only to training images — the validation split always sees the original (unaugmented) images.
+
+Configure it via the `augmentation:` section in `config.yaml`.
+
+### Presets
+
+| Preset | Description | Best for |
+|--------|-------------|---------|
+| `default` | HorizontalFlip (p=0.5) | General starting point |
+| `conservative` | Gentle brightness/contrast + flip | Small datasets < 500 images |
+| `aggressive` | Spatial + colour (flip, rotate, affine, jitter) | Large datasets 2000+ images |
+| `aerial` | Horizontal + vertical flip + 90° rotation + brightness | Satellite / overhead imagery |
+| `industrial` | Brightness + Gaussian blur + noise | Manufacturing / inspection |
+| `custom` | You define every transform | Full control |
+| `disabled` | No augmentation | Debugging, overfit test |
+
+```yaml
+augmentation:
+  preset: aggressive
+```
+
+### Custom Transforms
+
+Set `preset: custom` and list any albumentations transform under `transforms:`:
+
+```yaml
+augmentation:
+  preset: custom
+  transforms:
+    HorizontalFlip: {p: 0.5}
+    ColorJitter:    {brightness: 0.3, contrast: 0.3, saturation: 0.2, hue: 0.05, p: 0.6}
+    GaussianBlur:   {blur_limit: 3, p: 0.2}
+    Rotate:         {limit: 20, p: 0.4}
+    GaussNoise:     {std_range: [0.01, 0.05], p: 0.3}
+```
+
+**Geometric vs. pixel-level** — RF-DETR detects this automatically:
+- **Geometric** (`Rotate`, `Affine`, `Flip`, `Perspective`, `ElasticTransform`, …) — wrapped with `BboxParams` so bounding boxes and masks transform with the image.
+- **Pixel-level** (`ColorJitter`, `GaussNoise`, `GaussianBlur`, `RandomBrightnessContrast`, …) — applied to pixel values only; no coordinate adjustment needed.
+
+Container transforms are also supported:
+
+```yaml
+augmentation:
+  preset: custom
+  transforms:
+    HorizontalFlip: {p: 0.5}
+    OneOf:
+      - GaussianBlur: {blur_limit: 3, p: 1.0}
+      - GaussNoise:   {std_range: [0.01, 0.05], p: 1.0}
+    p: 0.3
+```
+
+### Choosing a Preset
+
+```
+Dataset size       Recommended preset
+────────────────────────────────────────
+< 500 images       conservative
+500 – 2000         default or conservative
+2000+              aggressive
+Satellite/aerial   aerial
+Manufacturing      industrial
+Unknown            start with default, evaluate, then step up
+```
+
+---
+
 ## Interpreting Training Output
 
 ### metrics_plot.png

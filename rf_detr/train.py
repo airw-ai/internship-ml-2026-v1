@@ -53,6 +53,7 @@ class TrainingConfig:
 
         self.train_args = self.config.get("training", {})
         self.export_cfg = self.config.get("export", {})
+        self.aug_cfg = self.config.get("augmentation", {})
 
     def validate(self):
         if self.variant not in MODEL_VARIANTS:
@@ -62,6 +63,56 @@ class TrainingConfig:
             )
         if not self.dataset_dir.exists():
             raise FileNotFoundError(f"Dataset directory not found: {self.dataset_dir}")
+
+
+_AUG_PRESETS = {
+    "conservative": "rfdetr.datasets.aug_config.AUG_CONSERVATIVE",
+    "aggressive":   "rfdetr.datasets.aug_config.AUG_AGGRESSIVE",
+    "aerial":       "rfdetr.datasets.aug_config.AUG_AERIAL",
+    "industrial":   "rfdetr.datasets.aug_config.AUG_INDUSTRIAL",
+}
+
+
+def _resolve_aug_config(aug_cfg: dict):
+    """
+    Convert the config.yaml ``augmentation:`` section into an ``aug_config``
+    dict suitable for ``model.train(aug_config=...)``.
+
+    Return values:
+      None  — let rfdetr use its built-in default (HorizontalFlip p=0.5)
+      {}    — no albumentations augmentation at all
+      dict  — custom or preset transform dict
+    """
+    if not aug_cfg:
+        return None  # rfdetr default
+
+    preset = str(aug_cfg.get("preset", "default")).lower()
+
+    if preset in ("default", ""):
+        return None  # rfdetr default
+
+    if preset == "disabled":
+        return {}  # empty dict → no augmentation
+
+    if preset in _AUG_PRESETS:
+        dotted = _AUG_PRESETS[preset]
+        module_path, attr = dotted.rsplit(".", 1)
+        import importlib
+        module = importlib.import_module(module_path)
+        return getattr(module, attr)
+
+    if preset == "custom":
+        transforms = aug_cfg.get("transforms") or {}
+        if not transforms:
+            print("Warning: augmentation.preset is 'custom' but no transforms defined. "
+                  "Falling back to rfdetr default.")
+            return None
+        return transforms
+
+    raise ValueError(
+        f"Unknown augmentation preset '{preset}'. "
+        f"Choose from: default | conservative | aggressive | aerial | industrial | custom | disabled"
+    )
 
 
 def _import_model_class(dotted_name: str):
@@ -91,10 +142,31 @@ def main():
     dotted_name, is_seg = MODEL_VARIANTS[cfg.variant]
     ModelClass = _import_model_class(dotted_name)
 
+    # Resolve augmentation config before printing summary
+    try:
+        aug_config = _resolve_aug_config(cfg.aug_cfg)
+    except ValueError as e:
+        print(f"Configuration error: {e}")
+        return 1
+
+    aug_preset = str(cfg.aug_cfg.get("preset", "default")).lower() if cfg.aug_cfg else "default"
+
     print("=" * 60)
     print(f"RF-DETR Training  |  variant: {cfg.variant}")
     print(f"Dataset : {cfg.dataset_dir}")
     print(f"Output  : {cfg.output_dir}")
+    print("=" * 60)
+    print(f"Augmentation preset : {aug_preset}")
+    if aug_config is None:
+        print("Augmentation        : HorizontalFlip {p: 0.5}  [rfdetr default]")
+    elif aug_config == {}:
+        print("Augmentation        : (disabled)")
+    else:
+        transforms = list(aug_config.items())
+        pad = " " * len("Augmentation        : ")
+        print(f"Augmentation        : {transforms[0][0]}: {transforms[0][1]}")
+        for name, params in transforms[1:]:
+            print(f"{pad}{name}: {params}")
     print("=" * 60)
 
     cfg.output_dir.mkdir(parents=True, exist_ok=True)
@@ -107,6 +179,11 @@ def main():
         "output_dir":   str(cfg.output_dir),
     }
     train_kwargs.update(cfg.train_args)
+
+    # Only inject aug_config when it's explicitly configured; None lets rfdetr
+    # apply its own default (AUG_CONFIG = HorizontalFlip p=0.5).
+    if aug_config is not None:
+        train_kwargs["aug_config"] = aug_config
 
     model.train(**train_kwargs)
 

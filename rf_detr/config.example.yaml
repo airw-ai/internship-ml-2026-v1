@@ -17,7 +17,7 @@ model:
   #   nano | small | medium | base | large
   # Segmentation variants:
   #   seg-nano | seg-small | seg-medium | seg-large
-  variant: seg-small
+  variant: seg-nano
 
 # -----------------------------------------------------------------------------
 # Local Paths
@@ -131,13 +131,330 @@ training:
   early_stopping_use_ema: false    # Evaluate EMA model for early stopping. (Default: False)
 
   # ── Logging ───────────────────────────────────────────────────────────────
-  tensorboard: true           # Write TensorBoard logs. (Default: True)
+  tensorboard: false           # Write TensorBoard logs. (Default: True)
   wandb: false                # Log to Weights & Biases. (Default: False)
   # project: null             # W&B / run project name. (Default: None)
   # run: null                 # W&B / run name. (Default: None)
 
   # ── Evaluation ────────────────────────────────────────────────────────────
   run_test: false              # Evaluate on test split after training. (Default: True)
+
+
+# -----------------------------------------------------------------------------
+# Augmentation  (Albumentations)
+# -----------------------------------------------------------------------------
+# Controls which albumentations transforms are applied to TRAINING images only.
+# Validation images are never augmented.
+#
+# preset choices:
+#   default      — HorizontalFlip(p=0.5) only  [rfdetr built-in default]
+#   conservative — gentle colour/brightness; good for small datasets (<500 imgs)
+#   aggressive   — spatial + colour; suited for large datasets (2000+ imgs)
+#   aerial       — horizontal + vertical flip + 90° rotation; satellite imagery
+#   industrial   — brightness + blur + noise; manufacturing / inspection data
+#   custom       — use the transforms block below (you define every transform)
+#   disabled     — no albumentations augmentation whatsoever
+#
+# How transforms are applied:
+#   Geometric transforms alter pixel positions, so bounding boxes and masks are
+#   automatically updated to match.  Pixel-level transforms only change colour
+#   values and leave coordinates untouched.  RF-DETR detects the category of
+#   each transform automatically — you never need to configure this yourself.
+# -----------------------------------------------------------------------------
+augmentation:
+  preset: default
+
+  # ── Built-in preset reference ─────────────────────────────────────────────
+  # conservative:
+  #   HorizontalFlip:           {p: 0.5}
+  #   RandomBrightnessContrast: {brightness_limit: 0.1, contrast_limit: 0.1, p: 0.3}
+  #
+  # aggressive:
+  #   HorizontalFlip:  {p: 0.5}
+  #   VerticalFlip:    {p: 0.5}
+  #   Rotate:          {limit: 45, p: 0.5}
+  #   Affine:          {scale: [0.8, 1.2], translate_percent: [0.1, 0.1],
+  #                    rotate: [-15, 15], shear: [-5, 5], p: 0.5}
+  #   ColorJitter:     {brightness: 0.2, contrast: 0.2, saturation: 0.2,
+  #                    hue: 0.1, p: 0.5}
+  #
+  # aerial:
+  #   HorizontalFlip:           {p: 0.5}
+  #   VerticalFlip:             {p: 0.5}
+  #   Rotate:                   {limit: [90, 90], p: 0.5}
+  #   RandomBrightnessContrast: {brightness_limit: 0.15, contrast_limit: 0.15, p: 0.4}
+  #
+  # industrial:
+  #   HorizontalFlip:           {p: 0.3}
+  #   RandomBrightnessContrast: {brightness_limit: 0.2, contrast_limit: 0.2, p: 0.5}
+  #   GaussianBlur:             {blur_limit: 3, p: 0.3}
+  #   GaussNoise:               {std_range: [0.01, 0.05], p: 0.3}
+
+  # ── Custom transforms (used only when preset: custom) ─────────────────────
+  # Uncomment the block below and add any transforms from the reference below.
+  #
+  # transforms:
+  #   HorizontalFlip: {p: 0.5}
+  #   ColorJitter:    {brightness: 0.2, contrast: 0.2, saturation: 0.2, hue: 0.1, p: 0.5}
+  #   GaussNoise:     {std_range: [0.01, 0.05], p: 0.3}
+  #   Rotate:         {limit: 15, p: 0.4}
+
+  # ==========================================================================
+  # SUPPORTED TRANSFORMS REFERENCE
+  # ==========================================================================
+  # All transforms below can be used under `transforms:` when preset: custom.
+  # Every transform accepts `p` (probability, 0.0–1.0).
+  # Parameters shown are the most commonly tuned; all albumentations defaults
+  # apply for any parameter you omit.
+  # ==========================================================================
+
+  # ── GEOMETRIC — bbox and mask coordinates are updated automatically ────────
+  #
+  # Flips / transpositions
+  # ----------------------
+  # HorizontalFlip: {p: 0.5}
+  #   Mirror left↔right.
+  #
+  # VerticalFlip: {p: 0.5}
+  #   Mirror top↔bottom.  Useful for aerial imagery.
+  #
+  # Transpose: {p: 0.5}
+  #   Swap the x and y axes (diagonal reflection).
+  #
+  # D4: {p: 0.5}
+  #   All 8 symmetries of the square (4 rotations × 2 flips).
+  #   Equivalent to randomly applying any combination of HorizontalFlip,
+  #   VerticalFlip, and Transpose.
+  #
+  # Rotation
+  # --------
+  # Rotate: {limit: 45, p: 0.5}
+  #   limit: max rotation angle in degrees (symmetric, i.e. ±limit).
+  #          Pass [min, max] for an asymmetric range.
+  #   border_mode: 0 (black fill) | 1 (replicate) | 4 (reflect).
+  #
+  # RandomRotate90: {p: 0.5}
+  #   Rotate by a random multiple of 90°.  Good for top-down imagery.
+  #
+  # SafeRotate: {limit: 45, p: 0.5}
+  #   Like Rotate but guarantees no black border pixels appear by
+  #   cropping the largest safe rectangle after rotation.
+  #
+  # Affine transforms
+  # -----------------
+  # Affine: {scale: [0.8, 1.2], translate_percent: [-0.1, 0.1],
+  #          rotate: [-15, 15], shear: [-5, 5], p: 0.5}
+  #   Combined scale + translate + rotate + shear in one transform.
+  #   scale:             zoom range as [min, max] fraction.
+  #   translate_percent: shift as fraction of image size.
+  #   rotate:            rotation range in degrees [min, max].
+  #   shear:             shear range in degrees [min, max].
+  #
+  # ShiftScaleRotate: {shift_limit: 0.1, scale_limit: 0.1,
+  #                   rotate_limit: 45, p: 0.5}
+  #   Older combined transform; Affine is more flexible.
+  #   shift_limit:  max translation as image fraction.
+  #   scale_limit:  ±zoom delta (0.1 → 0.9–1.1×).
+  #   rotate_limit: ±rotation in degrees.
+  #
+  # Perspective / distortion
+  # ------------------------
+  # Perspective: {scale: [0.05, 0.1], p: 0.5}
+  #   Applies a random four-point perspective warp.
+  #   scale: range of distortion strength as image fraction.
+  #
+  # ElasticTransform: {alpha: 1.0, sigma: 50.0, p: 0.5}
+  #   Elastic deformation — simulates physically deformed surfaces.
+  #   alpha: deformation intensity.
+  #   sigma: smoothing factor (larger = smoother warps).
+  #   Best avoided for rigid objects; useful for organic shapes.
+  #
+  # GridDistortion: {num_steps: 5, distort_limit: 0.3, p: 0.5}
+  #   Divides the image into a grid and randomly shifts grid nodes.
+  #   num_steps:     number of grid divisions per axis.
+  #   distort_limit: max shift per node as image fraction.
+  #
+  # OpticalDistortion: {distort_limit: 0.05, shift_limit: 0.05, p: 0.5}
+  #   Barrel / pincushion lens distortion.
+  #   distort_limit: radial distortion strength.
+  #   shift_limit:   tangential distortion strength.
+  #
+  # Cropping
+  # --------
+  # RandomResizedCrop: {size: [640, 640], scale: [0.5, 1.0],
+  #                    ratio: [0.75, 1.33], p: 1.0}
+  #   Crop a random region then resize to `size`.
+  #   scale: area fraction range of the crop relative to the full image.
+  #   ratio: aspect ratio range of the crop.
+  #   NOTE: RF-DETR already handles multi-scale resizing internally;
+  #         use this only if you want additional crop-level variation.
+  #
+  # RandomSizedBBoxSafeCrop: {height: 640, width: 640, p: 0.5}
+  #   Crop while guaranteeing at least one bounding box is preserved.
+  #   Safer than RandomResizedCrop when annotations are dense.
+  #
+  # CropAndPad: {percent: [-0.1, 0.1], p: 0.5}
+  #   Randomly shrink or expand the image canvas, padding with zeros.
+  #   percent: negative = crop inward, positive = pad outward.
+  #
+  # Padding / symmetry
+  # ------------------
+  # PadIfNeeded: {min_height: 640, min_width: 640,
+  #               border_mode: 0, value: 0, p: 1.0}
+  #   Pad image to at least min_height × min_width.
+  #   border_mode: 0 = constant fill (use `value` for fill colour).
+  #
+  # ── PIXEL-LEVEL — coordinates are NOT changed ─────────────────────────────
+  #
+  # Colour / brightness
+  # -------------------
+  # ColorJitter: {brightness: 0.2, contrast: 0.2,
+  #               saturation: 0.2, hue: 0.1, p: 0.5}
+  #   PyTorch-style combined colour jitter.
+  #   brightness:  ± delta applied to brightness (0 = no change).
+  #   contrast:    ± delta applied to contrast.
+  #   saturation:  ± delta applied to saturation.
+  #   hue:         ± delta applied to hue (max meaningful value ≈ 0.5).
+  #
+  # RandomBrightnessContrast: {brightness_limit: 0.2,
+  #                            contrast_limit: 0.2, p: 0.5}
+  #   Simpler brightness + contrast jitter.
+  #   brightness_limit: ± range of brightness shift (e.g. 0.2 → ±20 %).
+  #   contrast_limit:   ± range of contrast shift.
+  #
+  # HueSaturationValue: {hue_shift_limit: 20, sat_shift_limit: 30,
+  #                      val_shift_limit: 20, p: 0.5}
+  #   Shift hue, saturation, and value independently in HSV space.
+  #   hue_shift_limit: ± hue shift in degrees (0–180 range).
+  #   sat_shift_limit: ± saturation shift.
+  #   val_shift_limit: ± brightness (value) shift.
+  #
+  # RGBShift: {r_shift_limit: 20, g_shift_limit: 20,
+  #            b_shift_limit: 20, p: 0.5}
+  #   Add independent random offsets to each RGB channel.
+  #   Useful when channel imbalance is a real-world variation to simulate.
+  #
+  # RandomGamma: {gamma_limit: [80, 120], p: 0.5}
+  #   Apply random gamma correction.
+  #   gamma_limit: [min, max] gamma × 100 (100 = no change).
+  #
+  # CLAHE: {clip_limit: 4.0, tile_grid_size: [8, 8], p: 0.5}
+  #   Contrast Limited Adaptive Histogram Equalisation.
+  #   clip_limit:     threshold for contrast amplification.
+  #   tile_grid_size: grid size for local equalisation.
+  #   Useful for low-contrast or medical imagery.
+  #
+  # ToGray: {p: 0.1}
+  #   Convert RGB image to grayscale (replicated across 3 channels).
+  #   Use sparingly; discard colour information only if intentional.
+  #
+  # ChannelShuffle: {p: 0.05}
+  #   Randomly permute the order of RGB channels.
+  #   Use at low probability; can confuse colour-sensitive detectors.
+  #
+  # Blur / sharpness
+  # ----------------
+  # GaussianBlur: {blur_limit: [3, 7], sigma_limit: 0, p: 0.3}
+  #   Apply Gaussian blur.
+  #   blur_limit: [min, max] kernel size (must be odd); pass a single odd
+  #               integer for a fixed kernel.
+  #   sigma_limit: 0 = derive sigma automatically from kernel size.
+  #
+  # MotionBlur: {blur_limit: 7, p: 0.3}
+  #   Simulate camera or subject motion blur.
+  #   blur_limit: max kernel size.
+  #
+  # MedianBlur: {blur_limit: 7, p: 0.2}
+  #   Median filter — reduces salt-and-pepper noise while preserving edges.
+  #   blur_limit: max kernel size (must be odd).
+  #
+  # Sharpen: {alpha: [0.2, 0.5], lightness: [0.5, 1.0], p: 0.3}
+  #   Enhance edges using an unsharp mask.
+  #   alpha:     blending weight of the sharpened layer.
+  #   lightness: brightness scaling of the sharpened layer.
+  #
+  # Noise
+  # -----
+  # GaussNoise: {std_range: [0.01, 0.05], p: 0.3}
+  #   Add Gaussian noise sampled from N(0, std²).
+  #   std_range: [min, max] noise standard deviation as image fraction.
+  #
+  # ISONoise: {color_shift: [0.01, 0.05],
+  #            intensity: [0.1, 0.5], p: 0.3}
+  #   Simulate camera ISO sensor noise (luminance + colour noise).
+  #   color_shift: range of colour variance added.
+  #   intensity:   range of luminance noise intensity.
+  #
+  # Dropout / erasure
+  # -----------------
+  # CoarseDropout: {max_holes: 8, max_height: 32, max_width: 32,
+  #                 fill_value: 0, p: 0.3}
+  #   Randomly erase rectangular patches (Cutout / random erasing).
+  #   max_holes:  maximum number of patches to erase per image.
+  #   max_height / max_width: maximum patch size in pixels.
+  #   fill_value: fill with 0 (black), 128 (grey), or "random".
+  #
+  # Weather / scene effects
+  # -----------------------
+  # RandomFog: {fog_coef_lower: 0.1, fog_coef_upper: 0.3, p: 0.2}
+  #   Overlay a synthetic fog layer.
+  #   fog_coef: 0 = clear, 1 = fully opaque white.
+  #
+  # RandomRain: {slant_lower: -10, slant_upper: 10,
+  #              drop_length: 20, drop_width: 1,
+  #              drop_color: [200, 200, 200], p: 0.2}
+  #   Overlay synthetic rain streaks.
+  #   slant: angle of rain streaks in degrees.
+  #   drop_length / drop_width: streak dimensions in pixels.
+  #
+  # RandomShadow: {shadow_roi: [0, 0.5, 1, 1],
+  #                num_shadows_limit: [1, 2], p: 0.3}
+  #   Add random shadow polygons (simulates overcast / tree shadows).
+  #   shadow_roi: [x_min, y_min, x_max, y_max] as image fractions.
+  #
+  # RandomSnow: {snow_point_lower: 0.1, snow_point_upper: 0.3,
+  #              brightness_coeff: 2.5, p: 0.2}
+  #   Overlay synthetic snow particles.
+  #   snow_point: fraction of bright pixels converted to snow.
+  #
+  # RandomSunFlare: {src_radius: 100, p: 0.1}
+  #   Add a synthetic lens flare originating from a random point.
+  #   src_radius: radius of the flare halo in pixels.
+  #
+  # ── CONTAINER TRANSFORMS ──────────────────────────────────────────────────
+  # Containers apply a group of transforms with a shared probability or
+  # selection policy.  Nest them under transforms: like any other transform.
+  #
+  # OneOf: apply exactly one of the listed transforms, chosen at random.
+  # Each inner transform should use p: 1.0 (the outer p controls whether
+  # the group fires at all).
+  #
+  # transforms:
+  #   OneOf:
+  #     - GaussianBlur: {blur_limit: [3, 5], p: 1.0}
+  #     - MotionBlur:   {blur_limit: 5, p: 1.0}
+  #     - MedianBlur:   {blur_limit: 5, p: 1.0}
+  #   p: 0.4                          # probability of the whole OneOf block
+  #
+  # Sequential: apply all listed transforms in order (useful when you want
+  # deterministic ordering within a group).
+  #
+  # transforms:
+  #   Sequential:
+  #     - HorizontalFlip: {p: 0.5}
+  #     - Rotate:         {limit: 15, p: 0.4}
+  #   p: 1.0
+  #
+  # SomeOf: apply exactly N of the listed transforms, chosen at random.
+  #
+  # transforms:
+  #   SomeOf:
+  #     n: 2                          # how many to pick
+  #     transforms:
+  #       - HorizontalFlip:           {p: 1.0}
+  #       - RandomBrightnessContrast: {p: 1.0}
+  #       - GaussNoise:               {p: 1.0}
+  #   p: 0.5
 
 
 # -----------------------------------------------------------------------------
@@ -231,5 +548,30 @@ export:
 #   sync_bn: true
 #   gradient_checkpointing: true   # ~30-40 % less VRAM, ~20 % slower
 #   num_workers: 4
+#
+# Example 7: Aggressive augmentation for a large dataset
+# -------------------------------------------------------
+# augmentation:
+#   preset: aggressive
+#
+# Example 8: Aerial / satellite imagery
+# ---------------------------------------
+# augmentation:
+#   preset: aerial
+#
+# Example 9: Custom augmentation pipeline
+# ----------------------------------------
+# augmentation:
+#   preset: custom
+#   transforms:
+#     HorizontalFlip: {p: 0.5}
+#     ColorJitter:    {brightness: 0.3, contrast: 0.3, saturation: 0.2, hue: 0.05, p: 0.6}
+#     GaussianBlur:   {blur_limit: 3, p: 0.2}
+#     Rotate:         {limit: 20, p: 0.4}
+#
+# Example 10: Disable all augmentation (useful for debugging / overfitting test)
+# -------------------------------------------------------------------------------
+# augmentation:
+#   preset: disabled
 #
 # =============================================================================
