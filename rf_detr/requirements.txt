@@ -1,0 +1,7 @@
+rfdetr>=1.3.0
+PyYAML>=6.0.2
+supervision>=0.25.0
+onnx>=1.14.0
+
+# Optional: ONNX graph simplification (export.simplify: true)
+# pip install rfdetr[onnxexport]   # installs onnxsim

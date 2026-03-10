@@ -207,12 +207,14 @@ marimo/_lsp/
 __marimo__/
 
 # config.yaml
-model_training/config.yaml
-model_training/config.best.yaml
+yolo/config.yaml
+yolo/config.best.yaml
+rf_detr/config.yaml
 
 # gdrive assets
-model_training/weights
-model_training/dataset
+dataset/weights
+dataset/internship_dataset
+dataset/internship_dataset_coco
 
 # outputs
 runs

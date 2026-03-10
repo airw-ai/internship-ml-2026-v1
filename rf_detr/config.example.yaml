@@ -1,0 +1,235 @@
+# =============================================================================
+# RF-DETR Training Configuration
+# =============================================================================
+# Copy this file to config.yaml and adjust for your run.
+# Dataset must be in COCO JSON format with the Roboflow directory layout:
+#   dataset_dir/
+#   ├── train/   _annotations.coco.json  + images
+#   └── valid/   _annotations.coco.json  + images
+# Use ../dataset/convert_yolo_to_coco.py to convert from YOLO format.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Model Configuration
+# -----------------------------------------------------------------------------
+model:
+  # Model variant to use. Detection variants:
+  #   nano | small | medium | base | large
+  # Segmentation variants:
+  #   seg-nano | seg-small | seg-medium | seg-large
+  variant: seg-small
+
+# -----------------------------------------------------------------------------
+# Local Paths
+# -----------------------------------------------------------------------------
+local:
+  # Root of your COCO-format dataset.
+  # Expected layout:
+  #   dataset_dir/
+  #   ├── train/
+  #   │   ├── _annotations.coco.json
+  #   │   └── *.jpg
+  #   └── valid/
+  #       ├── _annotations.coco.json
+  #       └── *.jpg
+  dataset_dir: "../dataset/internship_dataset_coco"
+
+  # Directory where checkpoints and metrics are written.
+  output_dir: "../runs/rf_detr"
+
+# -----------------------------------------------------------------------------
+# Training Hyperparameters
+# All keys here are forwarded directly to model.train(**kwargs).
+# See: https://github.com/roboflow/rf-detr for full parameter list.
+# -----------------------------------------------------------------------------
+training:
+  # ── Core ─────────────────────────────────────────────────────────────────
+  epochs: 50                  # Total training epochs. (Default: 100)
+  batch_size: 4               # Images per GPU per step. Lower if OOM. (Default: 4)
+  grad_accum_steps: 4         # Gradient accumulation steps. (Default: 4)
+                              # Effective batch = batch_size × n_gpus × grad_accum_steps
+
+  # ── Learning Rate ─────────────────────────────────────────────────────────
+  lr: 1.0e-4                  # Base learning rate. (Default: 1e-4)
+  lr_encoder: 1.5e-4          # Learning rate for the encoder backbone. (Default: 1.5e-4)
+  lr_vit_layer_decay: 0.8     # Layer-wise LR decay for ViT layers. (Default: 0.8)
+  lr_component_decay: 0.7     # LR decay for other model components. (Default: 0.7)
+  lr_drop: 100                # Epoch at which LR is dropped. (Default: 100)
+  warmup_epochs: 0.0          # Linear warmup duration in epochs. (Default: 0.0)
+  weight_decay: 1.0e-4        # L2 regularisation. (Default: 1e-4)
+
+  # ── EMA ───────────────────────────────────────────────────────────────────
+  use_ema: true               # Exponential Moving Average of weights. (Default: True)
+  ema_decay: 0.993            # EMA decay rate. (Default: 0.993)
+  ema_tau: 100                # EMA tau (warmup steps). (Default: 100)
+
+  # ── Augmentation ──────────────────────────────────────────────────────────
+  multi_scale: true           # Multi-scale training. (Default: True)
+  expanded_scales: true       # Use additional scale levels. (Default: True)
+  do_random_resize_via_padding: false  # Resize with padding instead of crop. (Default: False)
+  square_resize_div_64: true  # Resize images to multiples of 64. (Default: True)
+  drop_path: 0.0              # Stochastic depth / drop path rate. (Default: 0.0)
+
+  # ── Regularisation ────────────────────────────────────────────────────────
+  group_detr: 13              # Group DETR queries for contrastive training. (Default: 13)
+  ia_bce_loss: true           # Instance-aware BCE loss. (Default: True)
+  cls_loss_coef: 1.0          # Classification loss coefficient. (Default: 1.0)
+  num_select: 300             # Top-K predictions kept after decoder. (Default: 300)
+  eval_max_dets: 500          # Max detections during evaluation. (Default: 500)
+
+  # ── Device ────────────────────────────────────────────────────────────────
+  # Single-GPU / CPU target device.
+  # In multi-GPU mode (torchrun) this is ignored — each process automatically
+  # uses the GPU assigned by LOCAL_RANK.  Leave as "cuda" for GPU training.
+  device: cuda                # "cuda" | "cpu" | "mps". (Default: "cuda")
+
+  # ── Multi-GPU (DistributedDataParallel via torchrun) ──────────────────────
+  #
+  # RF-DETR uses PyTorch DDP for multi-GPU training.  Distributed mode is
+  # activated automatically when the script is launched with torchrun — no
+  # config flag is needed.  The parameters below tune DDP behaviour.
+  #
+  # Launch commands:
+  #
+  #   Single GPU (normal):
+  #     python train.py
+  #
+  #   Multi-GPU — single machine, N GPUs:
+  #     torchrun --nproc_per_node=N train.py
+  #
+  #   Multi-GPU — 2 nodes, 4 GPUs each (run on EVERY node):
+  #     torchrun --nproc_per_node=4 --nnodes=2 --node_rank=<0|1> \
+  #              --master_addr=<node0_ip> --master_port=29500 train.py
+  #
+  # Effective batch size = batch_size × n_gpus × grad_accum_steps
+  # When adding GPUs, lower batch_size proportionally so the effective batch
+  # stays the same, e.g. 4 GPUs: batch_size=4→1, or keep it and accept the
+  # larger effective batch (may need a LR adjustment).
+  #
+  sync_bn: true              # SyncBatchNorm across GPUs — keeps BN stats
+                             # consistent; recommended for DDP. (Default: true)
+  dist_url: "env://"         # Rendezvous backend for torch.distributed.
+                             # "env://" reads MASTER_ADDR/PORT set by torchrun.
+                             # TCP alternative: "tcp://<host>:<port>". (Default: "env://")
+  gradient_checkpointing: false  # Trade compute for memory: recompute activations
+                                 # during backward pass instead of storing them.
+                                 # Reduces VRAM ~30-40 % at ~20 % speed cost.
+                                 # Useful when batch_size can't be reduced further.
+                                 # (Default: false)
+
+  # ── Data Loading ──────────────────────────────────────────────────────────
+  num_workers: 2              # DataLoader workers *per GPU process*. (Default: 2)
+
+  # ── Checkpointing ─────────────────────────────────────────────────────────
+  checkpoint_interval: 10     # Save checkpoint every N epochs. (Default: 10)
+  resume: null                # Path to checkpoint to resume from. (Default: None)
+
+  # ── Early Stopping ────────────────────────────────────────────────────────
+  early_stopping: false            # Enable early stopping. (Default: False)
+  early_stopping_patience: 10      # Epochs without improvement before stop. (Default: 10)
+  early_stopping_min_delta: 0.001  # Minimum improvement to reset patience. (Default: 0.001)
+  early_stopping_use_ema: false    # Evaluate EMA model for early stopping. (Default: False)
+
+  # ── Logging ───────────────────────────────────────────────────────────────
+  tensorboard: true           # Write TensorBoard logs. (Default: True)
+  wandb: false                # Log to Weights & Biases. (Default: False)
+  # project: null             # W&B / run project name. (Default: None)
+  # run: null                 # W&B / run name. (Default: None)
+
+  # ── Evaluation ────────────────────────────────────────────────────────────
+  run_test: false              # Evaluate on test split after training. (Default: True)
+
+
+# -----------------------------------------------------------------------------
+# ONNX Export
+# -----------------------------------------------------------------------------
+# After training completes, the model is automatically exported to ONNX using
+# the best weights (RF-DETR restores the best checkpoint at the end of training).
+# In multi-GPU runs only the main process (rank 0) performs the export.
+# Output: <output_dir>/onnx/inference_model.onnx
+#         (segmentation models: dets + labels + masks outputs)
+# -----------------------------------------------------------------------------
+export:
+  enabled: true           # Export to ONNX after training. (Default: true)
+
+  opset_version: 17       # ONNX opset version. 17 is recommended for broad
+                          # compatibility with ONNX Runtime >= 1.14. (Default: 17)
+
+  batch_size: 1           # Static batch size baked into the ONNX graph.
+                          # Use 1 for deployment; increase only if you always
+                          # run inference in fixed batches. (Default: 1)
+
+  simplify: false         # Run onnx-simplifier after export to fold constants
+                          # and clean up the graph — improves ONNX Runtime
+                          # performance and reduces file size.
+                          # Requires: pip install rfdetr[onnxexport]
+                          # (installs onnx + onnxsim). (Default: false)
+
+# =============================================================================
+# Configuration Examples
+# =============================================================================
+#
+# Example 1: Quick test run
+# -------------------------
+# training:
+#   epochs: 5
+#   batch_size: 2
+#   grad_accum_steps: 1
+#   num_workers: 0
+#
+# Example 2: Production detection (larger model)
+# -----------------------------------------------
+# model:
+#   variant: large
+# training:
+#   epochs: 100
+#   batch_size: 8
+#   grad_accum_steps: 2
+#   lr: 5.0e-5
+#   use_ema: true
+#   early_stopping: true
+#   early_stopping_patience: 15
+#
+# Example 3: Segmentation training
+# ----------------------------------
+# model:
+#   variant: seg-medium
+# training:
+#   epochs: 80
+#   batch_size: 4
+#   grad_accum_steps: 4
+#   cls_loss_coef: 5.0
+#
+# Example 4: Resume from checkpoint
+# -----------------------------------
+# training:
+#   resume: "../runs/rf_detr/checkpoint_epoch_30.pth"
+#
+# Example 5: Multi-GPU on a single machine (4 GPUs)
+# ---------------------------------------------------
+# Launch with:  torchrun --nproc_per_node=4 train.py
+#
+# Effective batch = batch_size(4) × n_gpus(4) × grad_accum_steps(4) = 64
+# Same effective batch as single-GPU with batch_size=16, grad_accum=4.
+#
+# training:
+#   device: cuda
+#   batch_size: 4               # per-GPU batch; total = 4 × 4 GPUs = 16 imgs/step
+#   grad_accum_steps: 4         # effective batch = 64
+#   sync_bn: true               # required for correct BN stats across GPUs
+#   num_workers: 4              # workers per GPU process (increase with more CPUs)
+#   gradient_checkpointing: false  # set true if still OOM after lowering batch_size
+#
+# Example 6: Multi-GPU, memory-constrained (gradient checkpointing)
+# ------------------------------------------------------------------
+# Launch with:  torchrun --nproc_per_node=2 train.py
+#
+# training:
+#   device: cuda
+#   batch_size: 2               # very small per-GPU batch
+#   grad_accum_steps: 8         # effective batch = 2 × 2 GPUs × 8 = 32
+#   sync_bn: true
+#   gradient_checkpointing: true   # ~30-40 % less VRAM, ~20 % slower
+#   num_workers: 4
+#
+# =============================================================================
