@@ -212,6 +212,8 @@ yolo/config.best.yaml
 rf_detr/config.yaml
 
 # gdrive assets
+yolo/weights
+yolo/*dataset*
 dataset/weights
 dataset/internship_dataset
 dataset/internship_dataset_coco
@@ -220,4 +222,5 @@ dataset/internship_dataset_coco
 runs
 *.onnx
 *.pt
+*.pth
 
